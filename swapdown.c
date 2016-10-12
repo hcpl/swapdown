@@ -11,14 +11,6 @@
 #include <string.h>
 
 
-static volatile pid_t child_pid = 0;
-
-static void propagator(int sig) {
-    if (child_pid > 0) {
-        kill(child_pid, sig);
-    }
-}
-
 #define exit_error(message) \
     perror(message); \
     exit(EXIT_FAILURE);
@@ -27,6 +19,35 @@ static void propagator(int sig) {
     if (cond) { \
         exit_error(message); \
     }
+
+
+static volatile pid_t child_pid = 0;
+
+static void propagator(int sig) {
+    if (child_pid > 0) {
+        kill(child_pid, sig);
+    }
+}
+
+static void set_signal_handlers() {
+    size_t i;
+    int signums[] = {
+        SIGHUP,
+        SIGINT,
+        SIGQUIT,
+        SIGTERM,
+        SIGCONT,
+        SIGTSTP,
+    };
+
+    for (i = 0; i < sizeof(signums) / sizeof(int); ++i) {
+        if (signal(signums[i], propagator) == SIG_ERR) {
+            fprintf(stderr, "%2d ", signums[i]);
+            exit_error("signal");
+        }
+    }
+}
+
 
 #define SBIN_PATH(executable) "/sbin/" executable
 
@@ -70,8 +91,7 @@ static void _call_handler(char const *executable,
     _call_handler(executable, SBIN_PATH(executable))
 
 int main() {
-    signal(SIGINT, propagator);
-    signal(SIGTERM, propagator);
+    set_signal_handlers();
 
     call_handler("swapoff");
     call_handler("swapon");

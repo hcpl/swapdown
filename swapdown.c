@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 1
+#define _POSIX_C_SOURCE 200809L
 
 #include <signal.h>
 #include <sys/types.h>
@@ -30,6 +30,7 @@ static void propagator(int sig) {
 }
 
 static void set_signal_handlers() {
+    struct sigaction sa;
     size_t i;
     int signums[] = {
         SIGHUP,
@@ -40,8 +41,14 @@ static void set_signal_handlers() {
         SIGTSTP,
     };
 
+    sa.sa_handler = propagator;
+    sigfillset(&sa.sa_mask);    /* Block all signals */
+#ifdef SA_RESTART
+    sa.sa_flags = SA_RESTART;
+#endif
+
     for (i = 0; i < sizeof(signums) / sizeof(int); ++i) {
-        if (signal(signums[i], propagator) == SIG_ERR) {
+        if (sigaction(signums[i], &sa, NULL) == -1) {
             fprintf(stderr, "%2d ", signums[i]);
             exit_error("signal");
         }
